@@ -4,16 +4,21 @@
   - 0~5V -> (온도/습도) 선형 변환
   - EMA(지수이동평균)로 스파이크 완화
   - 시리얼 모니터로 주기 출력
-  - (옵션) RS485로 "온도,습도" 필터값만 전송 가능 (아래 USE_RS485=1)
+  - RS485로 "습도값" 전송 (NodeA 요청 시)
 
   배선:
     FTM02 +12V  -> 12V SMPS
     FTM02 GND   -> Arduino GND (공통 접지)
     FTM02 TEMP  -> A0 (0~5V)
     FTM02 HUM   -> A1 (0~5V)
+    RS485 DE    -> D2
+    RS485 RX    -> D9
+    RS485 TX    -> D10
 
   ⚠️ 주의: A0/A1에는 5V를 넘는 전압이 들어가면 안 됩니다.
 */
+
+#include <SoftwareSerial.h>
 
 //// ================= 사용자 설정(보정) =================
 // 아날로그 기준/ADC
@@ -40,10 +45,15 @@ const unsigned long PRINT_PERIOD_MS  = 500;  // 0.5초마다 표시
 const int   N_SAMPLES       = 4;    // 1~8 권장
 const int   SAMPLE_DELAY_US = 300;  // 샘플 사이 짧은 지연
 
+// RS485 통신 설정
+#define RS485_DE 2
+#define RS485_RX 9
+#define RS485_TX 10
+SoftwareSerial rs485(RS485_RX, RS485_TX);
 
 // 핀 지정
-const int PIN_TEMP = A0;   // 온도 채널
-const int PIN_HUM  = A1;   // 습도 채널
+const int PIN_TEMP = A1;   // 온도 채널
+const int PIN_HUM  = A0;   // 습도 채널
 
 // 타이밍
 unsigned long lastSampleAt = 0;
@@ -87,10 +97,16 @@ void setup() {
   Serial.begin(115200);
   analogReference(DEFAULT); // 외부 레퍼런스를 쓸 경우 EXTERNAL
 
+  // RS485 초기화
+  pinMode(RS485_DE, OUTPUT);
+  digitalWrite(RS485_DE, LOW);  // 수신 모드로 시작
+  rs485.begin(9600);
+
   Serial.println(F("FTM02 온도/습도 측정 시작 (A0=온도, A1=습도, EMA 필터)"));
   Serial.print(F("T_MIN~T_MAX=")); Serial.print(T_MIN); Serial.print("~"); Serial.println(T_MAX);
   Serial.print(F("RH_MIN~RH_MAX=")); Serial.print(RH_MIN); Serial.print("~"); Serial.println(RH_MAX);
   Serial.print(F("ALPHA=")); Serial.println(ALPHA, 2);
+  Serial.println(F("RS485 통신 준비 완료"));
 }
 
 void loop() {
@@ -125,5 +141,32 @@ void loop() {
     Serial.print(tempEMA, 1);
     Serial.print(F("  습도[%RH]: "));
     Serial.println(humEMA, 1);
+  }
+
+  // 3) RS485 요청 처리
+  if (rs485.available()) {
+    String request = rs485.readStringUntil('\n');
+    request.trim();
+    
+    if (request == "REQ") {
+      // 습도값을 정수로 변환하여 응답
+      int humidity = (int)humEMA;
+      
+      // 송신 모드로 전환
+      digitalWrite(RS485_DE, HIGH);
+      delay(2);
+      
+      // 습도값 전송 (개행 문자 없이)
+      rs485.print(humidity);
+      rs485.print("\r\n");
+      rs485.flush();
+      
+      // 수신 모드로 복귀
+      delay(2);
+      digitalWrite(RS485_DE, LOW);
+      
+      Serial.print(F("RS485 응답: "));
+      Serial.println(humidity);
+    }
   }
 }
