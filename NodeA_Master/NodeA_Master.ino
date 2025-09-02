@@ -179,8 +179,8 @@ void checkScenarioModeEntry() {
     scenarioEntered = false;  // 진입 상태 리셋
   }
   
-  // STOP 버튼을 5초 이상 누르고 있을 때 시나리오 모드 진입
-  if (stopBtn && stopBtnPressed && !scenarioMode && !scenarioEntered && (millis() - stopBtnPressStart >= 5000)) {
+  // STOP 버튼을 3초 이상 누르고 있을 때 시나리오 모드 진입
+  if (stopBtn && stopBtnPressed && !scenarioMode && !scenarioEntered && (millis() - stopBtnPressStart >= 3000)) {
     scenarioMode = true;
     currentScenario = 0;
     scrollOffset = 0;
@@ -194,6 +194,9 @@ void checkScenarioModeEntry() {
       digitalWrite(BUZZER, LOW);
       delay(200);
     }
+    
+    // 진입 후 3초간 버튼 상태 무시 (바로 나가는 것 방지)
+    delay(2000);
   }
 }
 
