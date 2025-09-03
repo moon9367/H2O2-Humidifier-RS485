@@ -1,7 +1,7 @@
 {
     "configuration": "cpu=atmega328old",
     "board": "arduino:avr:nano",
-    "port": "COM2",
+    "port": "COM21",
     "programmer": "avrisp",
     "sketch": "NodeA_Master\\NodeA_Master.ino"
 }
